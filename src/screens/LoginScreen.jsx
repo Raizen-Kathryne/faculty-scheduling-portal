@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { User, Lock, School, X, AlertCircle, ShieldCheck, Loader2 } from 'lucide-react';
+import { User, Lock, School, X, AlertCircle, ShieldCheck, Loader2, Eye, EyeOff } from 'lucide-react'; // Added Eye, EyeOff
 import { loginFaculty, loginAdmin } from '../utils/auth';
 
 export default function LoginScreen({ onLogin }) {
@@ -10,6 +10,7 @@ export default function LoginScreen({ onLogin }) {
   
   // State to track if we are logging in as Admin or Faculty
   const [isAdminMode, setIsAdminMode] = useState(false); 
+  const [showPassword, setShowPassword] = useState(false); // Added state for password visibility
 
   const [credentials, setCredentials] = useState({ username: '', password: '' });
 
@@ -49,6 +50,7 @@ export default function LoginScreen({ onLogin }) {
   const openLoginModal = (mode) => {
     setIsAdminMode(mode === 'admin');
     setCredentials({ username: '', password: '' }); // Reset form
+    setShowPassword(false); // Reset password visibility when opening modal
     setError('');
     setShowModal(true);
   };
@@ -60,14 +62,16 @@ export default function LoginScreen({ onLogin }) {
         hover: 'hover:bg-indigo-700', 
         text: 'text-indigo-600',
         lightBg: 'bg-indigo-50',
-        border: 'border-indigo-500'
+        border: 'border-indigo-500',
+        focusRing: 'focus:ring-indigo-500' // Added for consistency
       }
     : { 
         bg: 'bg-emerald-600', 
         hover: 'hover:bg-emerald-700', 
         text: 'text-emerald-600',
         lightBg: 'bg-emerald-50',
-        border: 'border-emerald-500'
+        border: 'border-emerald-500',
+        focusRing: 'focus:ring-emerald-500' // Added for consistency
       };
 
   return (
@@ -161,21 +165,30 @@ export default function LoginScreen({ onLogin }) {
                   type="text" 
                   value={credentials.username} 
                   onChange={e => setCredentials({...credentials, username: e.target.value})} 
-                  className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-indigo-500 outline-none" 
+                  className={`w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 ${theme.focusRing} outline-none`} 
                   placeholder={isAdminMode ? "e.g. admin" : "e.g. faculty@university.edu"} 
                   required
                 />
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Password</label>
-                <input 
-                  type="password" 
-                  value={credentials.password} 
-                  onChange={e => setCredentials({...credentials, password: e.target.value})}
-                  className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-indigo-500 outline-none" 
-                  placeholder="••••••••" 
-                  required
-                />
+                <div className="relative">
+                  <input 
+                    type={showPassword ? "text" : "password"} // Dynamic type
+                    value={credentials.password} 
+                    onChange={e => setCredentials({...credentials, password: e.target.value})}
+                    className={`w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 ${theme.focusRing} outline-none pr-12`} 
+                    placeholder="••••••••" 
+                    required
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors p-1"
+                  >
+                    {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+                  </button>
+                </div>
               </div>
               
               <button 
