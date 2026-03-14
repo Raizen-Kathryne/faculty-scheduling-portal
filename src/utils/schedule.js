@@ -1,7 +1,7 @@
 // utils/schedule.js
 import { getToken, getFacultyData } from './auth';
 // http://localhost:5000
-const API_BASE_URL = 'https://tend-incentives-savings-floors.trycloudflare.com/api';
+const API_BASE_URL = import.meta.env.VITE_API_URL;
 // Use the key from your .env file
 const API_KEY = 'web_ibl9paqzNTF6at_gsIDX0krNbtaTloOTUVQbyuw2aHE'; 
 

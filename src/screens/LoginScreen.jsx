@@ -1,20 +1,18 @@
 import React, { useState, useEffect } from 'react';
-import { User, Lock, School, X, AlertCircle, ShieldCheck, Loader2, Eye, EyeOff } from 'lucide-react'; // Added Eye, EyeOff
+import { User, Lock, School, X, AlertCircle, ShieldCheck, Loader2, Eye, EyeOff } from 'lucide-react'; 
 import { loginFaculty, loginAdmin } from '../utils/auth';
 
-export default function LoginScreen({ onLogin }) {
+export default function LoginScreen({ onLogin, onOpenSchedules }) {
   const [showModal, setShowModal] = useState(false);
   const [loading, setLoading] = useState(false);
   const [currentDate, setCurrentDate] = useState(new Date());
   const [error, setError] = useState('');
   
-  // State to track if we are logging in as Admin or Faculty
   const [isAdminMode, setIsAdminMode] = useState(false); 
-  const [showPassword, setShowPassword] = useState(false); // Added state for password visibility
+  const [showPassword, setShowPassword] = useState(false); 
 
   const [credentials, setCredentials] = useState({ username: '', password: '' });
 
-  // Clock Timer
   useEffect(() => {
     const timer = setInterval(() => setCurrentDate(new Date()), 1000); 
     return () => clearInterval(timer);
@@ -27,18 +25,13 @@ export default function LoginScreen({ onLogin }) {
 
     try {
       let response;
-      
-      // Use the appropriate login function based on mode
       if (isAdminMode) {
         response = await loginAdmin(credentials.username, credentials.password);
       } else {
         response = await loginFaculty(credentials.username, credentials.password);
       }
-      
       setShowModal(false);
-      // Pass the user data and role to parent component
       onLogin(response.user || response.faculty, isAdminMode ? 'admin' : 'faculty'); 
-      
     } catch (err) {
       setError(err.message || 'Login failed. Please try again.');
     } finally {
@@ -46,43 +39,28 @@ export default function LoginScreen({ onLogin }) {
     }
   };
 
-  // Helper to open the modal in the correct mode
   const openLoginModal = (mode) => {
     setIsAdminMode(mode === 'admin');
-    setCredentials({ username: '', password: '' }); // Reset form
-    setShowPassword(false); // Reset password visibility when opening modal
+    setCredentials({ username: '', password: '' }); 
+    setShowPassword(false); 
     setError('');
     setShowModal(true);
   };
 
-  // Dynamic Theme Colors based on mode (Green for Faculty, Indigo for Admin)
   const theme = isAdminMode 
-    ? { 
-        bg: 'bg-indigo-600', 
-        hover: 'hover:bg-indigo-700', 
-        text: 'text-indigo-600',
-        lightBg: 'bg-indigo-50',
-        border: 'border-indigo-500',
-        focusRing: 'focus:ring-indigo-500' // Added for consistency
-      }
-    : { 
-        bg: 'bg-emerald-600', 
-        hover: 'hover:bg-emerald-700', 
-        text: 'text-emerald-600',
-        lightBg: 'bg-emerald-50',
-        border: 'border-emerald-500',
-        focusRing: 'focus:ring-emerald-500' // Added for consistency
-      };
+    ? { bg: 'bg-indigo-600', hover: 'hover:bg-indigo-700', text: 'text-indigo-600', lightBg: 'bg-indigo-50', focusRing: 'focus:ring-indigo-500' }
+    : { bg: 'bg-emerald-600', hover: 'hover:bg-emerald-700', text: 'text-emerald-600', lightBg: 'bg-emerald-50', focusRing: 'focus:ring-emerald-500' };
 
   return (
     <div className="min-h-screen flex items-center justify-center p-4 sm:p-8 relative z-10">
-      
-      {/* Main Card */}
       <div className="bg-white/95 backdrop-blur-sm shadow-2xl rounded-3xl w-full max-w-5xl overflow-hidden flex flex-col md:flex-row min-h-[500px] animate-in fade-in zoom-in duration-300">
         
         {/* Left Side: Branding */}
         <div className="md:w-5/12 p-8 md:p-12 flex flex-col items-center justify-center text-center border-b md:border-r border-gray-100 bg-gradient-to-b from-white to-gray-50">
-          <div className="w-48 h-48 md:w-56 md:h-56 relative mb-6 group transition-transform hover:scale-105 duration-500">
+          <div 
+            onClick={() => window.open('http://192.168.18.23:5174/', '_blank')}
+            className="w-48 h-48 md:w-56 md:h-56 relative mb-6 group transition-transform hover:scale-105 duration-500 cursor-pointer"
+          >
             <div className="absolute inset-0 bg-emerald-600 rounded-full opacity-10 blur-xl group-hover:opacity-20 transition-opacity"></div>
             <div className="w-full h-full rounded-full border-4 border-emerald-500 bg-white flex items-center justify-center shadow-lg relative overflow-hidden">
                <div className="flex flex-col items-center justify-center text-emerald-800">
@@ -109,7 +87,6 @@ export default function LoginScreen({ onLogin }) {
           </div>
 
           <div className="space-y-4">
-            {/* BUTTON 1: FACULTY LOGIN */}
             <button 
               onClick={() => openLoginModal('faculty')}
               className="group w-full bg-emerald-600 hover:bg-emerald-700 text-white p-4 rounded-xl shadow-lg hover:shadow-emerald-500/30 transition-all flex items-center gap-4 text-lg font-bold"
@@ -123,7 +100,6 @@ export default function LoginScreen({ onLogin }) {
               </div>
             </button>
 
-            {/* BUTTON 2: ADMIN LOGIN */}
             <button 
               onClick={() => openLoginModal('admin')}
               className="group w-full bg-white border-2 border-indigo-100 hover:border-indigo-500 text-indigo-700 hover:bg-indigo-50 p-4 rounded-xl transition-all flex items-center gap-4 text-lg font-bold"
@@ -145,7 +121,6 @@ export default function LoginScreen({ onLogin }) {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-8 relative m-4 animate-in slide-in-from-bottom-10 zoom-in-95 duration-200">
             <button onClick={() => setShowModal(false)} className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 p-1"><X size={24} /></button>
-            
             <div className="text-center mb-8">
               <div className={`w-16 h-16 ${theme.lightBg} ${theme.text} rounded-full flex items-center justify-center mx-auto mb-4`}>
                 {isAdminMode ? <ShieldCheck size={32} /> : <Lock size={32} />}
@@ -174,7 +149,7 @@ export default function LoginScreen({ onLogin }) {
                 <label className="block text-sm font-medium text-gray-700 mb-1">Password</label>
                 <div className="relative">
                   <input 
-                    type={showPassword ? "text" : "password"} // Dynamic type
+                    type={showPassword ? "text" : "password"} 
                     value={credentials.password} 
                     onChange={e => setCredentials({...credentials, password: e.target.value})}
                     className={`w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 ${theme.focusRing} outline-none pr-12`} 
@@ -188,9 +163,8 @@ export default function LoginScreen({ onLogin }) {
                   >
                     {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
                   </button>
-                </div>
+                </div>g
               </div>
-              
               <button 
                 type="submit"
                 disabled={loading} 
@@ -204,4 +178,4 @@ export default function LoginScreen({ onLogin }) {
       )}
     </div>
   );
-}
+}gh 

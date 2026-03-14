@@ -1,6 +1,6 @@
 // utils/admin.js
 import { getToken } from './auth';
-const API_BASE_URL = 'https://tend-incentives-savings-floors.trycloudflare.com/api';
+const API_BASE_URL = import.meta.env.VITE_API_URL;
 
 // ⚠️ IMPORTANT: Ensure this matches your .env file
 const ADMIN_API_KEY = 'dev_iiFd8wGAKuaCXSzrtuOS9yKwzlsJDzPtludw-scosLY'; 

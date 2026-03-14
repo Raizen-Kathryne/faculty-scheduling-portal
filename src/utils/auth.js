@@ -6,7 +6,7 @@ import { jwtDecode } from 'jwt-decode';
 // If Solution 1 doesn't work, replace line 4 with:
 // import jwtDecode from 'jwt-decode';
 
-const API_BASE_URL = 'https://tend-incentives-savings-floors.trycloudflare.com/api';
+const API_BASE_URL = import.meta.env.VITE_API_URL;
 // Use the key from your .env file or hardcode for dev
 const API_KEY = 'web_ibl9paqzNTF6at_gsIDX0krNbtaTloOTUVQbyuw2aHE'; 
 

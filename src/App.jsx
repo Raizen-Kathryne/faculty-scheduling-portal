@@ -2,7 +2,8 @@
 import React, { useState } from 'react';
 import LoginScreen from './screens/LoginScreen';
 import FacultyScreen from './screens/FacultyScreen';
-import AdminScreen from './screens/AdminScreen'; // NEW IMPORT
+import AdminScreen from './screens/AdminScreen'; 
+import ScheduleScreen from './screens/ScheduleScreen'; // NEW IMPORT
 
 export default function App() {
   const [currentScreen, setCurrentScreen] = useState('login');
@@ -22,9 +23,12 @@ export default function App() {
         return <AdminScreen onLogout={() => setCurrentScreen('login')} />;
       case 'faculty':
         return <FacultyScreen onLogout={() => setCurrentScreen('login')} />;
+      case 'schedules': // NEW CASE FOR SCHEDULES
+        return <ScheduleScreen onBack={() => setCurrentScreen('login')} />;
       case 'login':
       default:
-        return <LoginScreen onLogin={handleLogin} />;
+        // PASS THE onOpenSchedules PROP HERE
+        return <LoginScreen onLogin={handleLogin} onOpenSchedules={() => setCurrentScreen('schedules')} />; 
     }
   };
 
@@ -40,7 +44,7 @@ export default function App() {
             <div className="absolute top-[40%] -right-[10%] w-[50%] h-[50%] bg-blue-600/10 rounded-full blur-3xl"></div>
           </>
         ) : (
-          // Faculty Green Theme Background
+          // Faculty/Schedules/Login Green Theme Background
           <>
             <div className="absolute -top-[20%] -left-[10%] w-[60%] h-[60%] bg-green-400/30 rounded-full blur-3xl"></div>
             <div className="absolute top-[40%] -right-[10%] w-[50%] h-[50%] bg-emerald-600/20 rounded-full blur-3xl"></div>
