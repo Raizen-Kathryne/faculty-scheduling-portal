@@ -1,5 +1,7 @@
 // screens/FacultyScreen.jsx
 import React, { useState, useEffect, useRef } from 'react';
+import * as XLSX from 'xlsx';
+import { sanitizeScheduleFile } from '../utils/sanitizeSchedule';
 import { 
   LogOut, Plus, Trash2, Clock, MapPin, X, Loader2, AlertCircle, 
   RefreshCw, LayoutGrid, Lock, Bell, Upload, FileDown, CheckCircle,
@@ -201,7 +203,11 @@ export default function FacultyScreen({ onLogout }) {
     setUploadResult(null);
     
     try {
-      const result = await uploadScheduleFile(uploadFile, uploadSemesterId);
+      // Sanitize the file client-side before sending to backend.
+      // This fixes AM/PM ambiguity in times like "04:00:00" (should be 16:00:00)
+      // and replaces N/A Subject Codes with the Activity Type value.
+      const sanitizedFile = await sanitizeScheduleFile(uploadFile, XLSX);
+      const result = await uploadScheduleFile(sanitizedFile, uploadSemesterId);
       setUploadResult(result);
       setUploadStatus('success');
       await loadData(); 
