@@ -58,7 +58,7 @@ export default function LoginScreen({ onLogin, onOpenSchedules }) {
         {/* Left Side: Branding */}
         <div className="md:w-5/12 p-8 md:p-12 flex flex-col items-center justify-center text-center border-b md:border-r border-gray-100 bg-gradient-to-b from-white to-gray-50">
           <div 
-            onClick={() => window.open('http://192.168.18.23:5174/', '_blank')}
+            onClick={() => window.open('http://192.168.18.28:5174/', '_blank')}
             className="w-48 h-48 md:w-56 md:h-56 relative mb-6 group transition-transform hover:scale-105 duration-500 cursor-pointer"
           >
             <div className="absolute inset-0 bg-emerald-600 rounded-full opacity-10 blur-xl group-hover:opacity-20 transition-opacity"></div>
@@ -178,4 +178,4 @@ export default function LoginScreen({ onLogin, onOpenSchedules }) {
       )}
     </div>
   );
-}gh 
+}
