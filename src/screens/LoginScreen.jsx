@@ -2,6 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { User, Lock, School, X, AlertCircle, ShieldCheck, Loader2, Eye, EyeOff } from 'lucide-react'; 
 import { loginFaculty, loginAdmin } from '../utils/auth';
 
+const redirect_BASE_URL = import.meta.env.VITE_WEB_REDIRECT;
+const PORTAL_URL = "http://10.42.0.1:5173";
+
 export default function LoginScreen({ onLogin, onOpenSchedules }) {
   const [showModal, setShowModal] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -58,7 +61,7 @@ export default function LoginScreen({ onLogin, onOpenSchedules }) {
         {/* Left Side: Branding */}
         <div className="md:w-5/12 p-8 md:p-12 flex flex-col items-center justify-center text-center border-b md:border-r border-gray-100 bg-gradient-to-b from-white to-gray-50">
           <div 
-            onClick={() => window.open('http://192.168.18.28:5174/', '_blank')}
+            onClick={() => window.open(redirect_BASE_URL, '_self')}
             className="w-48 h-48 md:w-56 md:h-56 relative mb-6 group transition-transform hover:scale-105 duration-500 cursor-pointer"
           >
             <div className="absolute inset-0 bg-emerald-600 rounded-full opacity-10 blur-xl group-hover:opacity-20 transition-opacity"></div>
@@ -73,6 +76,23 @@ export default function LoginScreen({ onLogin, onOpenSchedules }) {
             <span className="text-emerald-600">Portal Access</span>
           </h1>
           <p className="text-sm text-gray-400 mt-2">Secure Schedule Management</p>
+          {/* Network Access Info */}
+          <div className="mt-6 w-full bg-emerald-50 border border-emerald-200 rounded-2xl p-4 text-left">
+            <p className="text-xs font-bold text-emerald-700 uppercase tracking-wider mb-2 flex items-center gap-1">
+              <span>Connect from your phone</span> 
+            </p>
+            <p className="text-xs text-gray-500 mb-1">Join Wi-Fi: <span className="font-bold text-gray-700">Group 19 Kiosk</span></p>
+            <p className="text-xs text-gray-500 mb-3">No password required</p>
+            <div className="bg-white border border-emerald-100 rounded-lg px-3 py-2 flex items-center justify-between gap-2">
+              <span className="text-xs font-mono font-bold text-emerald-700 break-all">{PORTAL_URL}</span>
+              <button
+                onClick={() => navigator.clipboard.writeText(PORTAL_URL)}
+                className="text-[10px] bg-emerald-100 hover:bg-emerald-200 text-emerald-700 font-bold px-2 py-1 rounded transition-colors whitespace-nowrap"
+              >
+                Copy
+              </button>
+            </div>
+          </div>
         </div>
 
         {/* Right Side: Action Buttons */}
@@ -163,7 +183,7 @@ export default function LoginScreen({ onLogin, onOpenSchedules }) {
                   >
                     {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
                   </button>
-                </div>g
+                </div>
               </div>
               <button 
                 type="submit"
