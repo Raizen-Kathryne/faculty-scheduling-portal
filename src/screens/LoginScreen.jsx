@@ -182,7 +182,11 @@ export default function LoginScreen({ onLogin, onOpenSchedules }) {
             <form onSubmit={handleLogin} className="space-y-4">
               <div>
                 <label className="block text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mb-1 ml-1">
+<<<<<<< HEAD
                   {isAdminMode ? 'Username' : 'Employee ID'}
+=======
+                  {isAdminMode ? 'Username' : 'Username'}
+>>>>>>> e8694cb (faculty screen update)
                 </label>
                 <input 
                   type="text" 
