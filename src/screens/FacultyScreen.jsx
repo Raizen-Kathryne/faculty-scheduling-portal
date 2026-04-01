@@ -141,6 +141,7 @@ export default function FacultyScreen({ onLogout }) {
     const specificErrors = [];
 
     errors.forEach(err => {
+      // Check for "Missing required field: fieldname" pattern
       if (typeof err === 'string' && err.includes('Missing required field')) {
         const parts = err.split(':');
         const fieldName = parts[parts.length - 1].trim();
@@ -202,7 +203,11 @@ export default function FacultyScreen({ onLogout }) {
     setUploadResult(null);
     
     try {
+      // Sanitize the file client-side before sending to backend.
+      // This fixes AM/PM ambiguity in times like "04:00:00" (should be 16:00:00)
+      // and replaces N/A Subject Codes with the Activity Type value.
       const sanitizedFile = await sanitizeScheduleFile(uploadFile, XLSX);
+      
       const result = await uploadScheduleFile(sanitizedFile, uploadSemesterId);
       setUploadResult(result);
       setUploadStatus('success');
@@ -488,7 +493,7 @@ export default function FacultyScreen({ onLogout }) {
         </div>
       )}
 
-      {/* --- WEEKLY MODAL --- */}
+      {/* --- WEEKLY MODAL (FIXED) --- */}
       {showWeeklyModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-2 sm:p-4">
           <div className="bg-white rounded-xl sm:rounded-2xl shadow-2xl w-full max-w-6xl h-[95vh] sm:h-[90vh] flex flex-col overflow-hidden">
@@ -511,6 +516,11 @@ export default function FacultyScreen({ onLogout }) {
             
             <div className="flex-1 overflow-auto p-2 sm:p-6 bg-gray-50">
               <div className="bg-white rounded-lg sm:rounded-xl shadow-sm border border-gray-200 overflow-auto">
+                
+                {/* FIXED HERE: Added 'relative' class to the grid container.
+                   This ensures absolute children position themselves based on this grid, 
+                   not the whole screen.
+                */}
                 <div className="relative grid grid-cols-[50px_repeat(7,minmax(70px,1fr))] sm:grid-cols-[80px_repeat(7,1fr)] bg-gray-200 gap-px border border-gray-200 min-w-[600px]">
                   
                   <div className="bg-gray-100 p-2 sm:p-3 text-center text-[10px] sm:text-xs font-bold text-gray-500 uppercase tracking-wider sticky top-0 left-0 z-20">
@@ -622,84 +632,7 @@ export default function FacultyScreen({ onLogout }) {
               </div>
 
               <div><label className="block text-sm font-bold text-gray-700 mb-1">Day</label><select className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-emerald-500 outline-none bg-white" value={newClass.day} onChange={e => setNewClass({...newClass, day: e.target.value})}>{['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].map(d => (<option key={d} value={d}>{d}</option>))}</select></div>
-              
-              {/* --- UPDATED: TOUCH FRIENDLY TIME PICKER START --- */}
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-bold text-gray-700 mb-1">Start Time</label>
-                  <div className="flex gap-1 sm:gap-2">
-                    <select 
-                      className="w-full px-2 sm:px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-emerald-500 outline-none bg-white text-base" 
-                      value={newClass.startTime ? newClass.startTime.split(':')[0] : ''} 
-                      onChange={e => {
-                        const currentMin = (newClass.startTime && newClass.startTime.split(':')[1]) ? newClass.startTime.split(':')[1] : '00';
-                        setNewClass({...newClass, startTime: `${e.target.value}:${currentMin}`});
-                      }}
-                    >
-                      <option value="" disabled>HH</option>
-                      {Array.from({length: 24}).map((_, i) => {
-                        const val = i.toString().padStart(2, '0');
-                        const displayHour = i === 0 ? 12 : i > 12 ? i - 12 : i;
-                        const ampm = i < 12 ? 'AM' : 'PM';
-                        return <option key={val} value={val}>{val} ({displayHour} {ampm})</option>;
-                      })}
-                    </select>
-                    <span className="self-center font-bold text-gray-500">:</span>
-                    <select 
-                      className="w-full px-2 sm:px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-emerald-500 outline-none bg-white text-base" 
-                      value={newClass.startTime ? newClass.startTime.split(':')[1] : ''} 
-                      onChange={e => {
-                        const currentHour = (newClass.startTime && newClass.startTime.split(':')[0]) ? newClass.startTime.split(':')[0] : '07';
-                        setNewClass({...newClass, startTime: `${currentHour}:${e.target.value}`});
-                      }}
-                    >
-                      <option value="" disabled>MM</option>
-                      {Array.from({length: 60}).map((_, i) => {
-                        const val = i.toString().padStart(2, '0');
-                        return <option key={val} value={val}>{val}</option>;
-                      })}
-                    </select>
-                  </div>
-                </div>
-                <div>
-                  <label className="block text-sm font-bold text-gray-700 mb-1">End Time</label>
-                  <div className="flex gap-1 sm:gap-2">
-                    <select 
-                      className="w-full px-2 sm:px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-emerald-500 outline-none bg-white text-base" 
-                      value={newClass.endTime ? newClass.endTime.split(':')[0] : ''} 
-                      onChange={e => {
-                        const currentMin = (newClass.endTime && newClass.endTime.split(':')[1]) ? newClass.endTime.split(':')[1] : '00';
-                        setNewClass({...newClass, endTime: `${e.target.value}:${currentMin}`});
-                      }}
-                    >
-                      <option value="" disabled>HH</option>
-                      {Array.from({length: 24}).map((_, i) => {
-                        const val = i.toString().padStart(2, '0');
-                        const displayHour = i === 0 ? 12 : i > 12 ? i - 12 : i;
-                        const ampm = i < 12 ? 'AM' : 'PM';
-                        return <option key={val} value={val}>{val} ({displayHour} {ampm})</option>;
-                      })}
-                    </select>
-                    <span className="self-center font-bold text-gray-500">:</span>
-                    <select 
-                      className="w-full px-2 sm:px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-emerald-500 outline-none bg-white text-base" 
-                      value={newClass.endTime ? newClass.endTime.split(':')[1] : ''} 
-                      onChange={e => {
-                        const currentHour = (newClass.endTime && newClass.endTime.split(':')[0]) ? newClass.endTime.split(':')[0] : '07';
-                        setNewClass({...newClass, endTime: `${currentHour}:${e.target.value}`});
-                      }}
-                    >
-                      <option value="" disabled>MM</option>
-                      {Array.from({length: 60}).map((_, i) => {
-                        const val = i.toString().padStart(2, '0');
-                        return <option key={val} value={val}>{val}</option>;
-                      })}
-                    </select>
-                  </div>
-                </div>
-              </div>
-              {/* --- UPDATED: TOUCH FRIENDLY TIME PICKER END --- */}
-
+              <div className="grid grid-cols-2 gap-4"><div><label className="block text-sm font-bold text-gray-700 mb-1">Start Time</label><input type="time" className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-emerald-500 outline-none" value={newClass.startTime} onChange={e => setNewClass({...newClass, startTime: e.target.value})}/></div><div><label className="block text-sm font-bold text-gray-700 mb-1">End Time</label><input type="time" className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-emerald-500 outline-none" value={newClass.endTime} onChange={e => setNewClass({...newClass, endTime: e.target.value})}/></div></div>
               <div>
                 <label className="block text-sm font-bold text-gray-700 mb-1">Room Name</label>
                 <div className="flex gap-2">
@@ -758,6 +691,7 @@ export default function FacultyScreen({ onLogout }) {
                 {filteredRooms.map((room) => (
                 <button
                   key={room.room_id}
+                  // CHANGE THIS LINE: Remove building_name from the argument
                   onClick={() => selectRoom(room.room_name)} 
                   className="flex flex-col items-start p-3 hover:bg-emerald-50 rounded-xl transition-colors text-left border border-transparent hover:border-emerald-100 group"
                 >

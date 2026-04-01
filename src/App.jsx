@@ -7,22 +7,28 @@ import ScheduleScreen from './screens/ScheduleScreen'; // NEW IMPORT
 
 export default function App() {
   const [currentScreen, setCurrentScreen] = useState('login');
+  const [userData, setUserData] = useState(null); // ADD THIS
 
   // Handle Login: Accepts userData and the target role ('admin' or 'faculty')
   const handleLogin = (userData, role = 'faculty') => {
-    if (role === 'admin') {
-      setCurrentScreen('admin');
-    } else {
-      setCurrentScreen('faculty');
-    }
+  setUserData(userData); // ADD THIS
+  if (role === 'admin') {
+    setCurrentScreen('admin');
+  } else {
+    setCurrentScreen('faculty');
+  }
   };
+  
 
   const renderScreen = () => {
     switch (currentScreen) {
       case 'admin':
         return <AdminScreen onLogout={() => setCurrentScreen('login')} />;
       case 'faculty':
-        return <FacultyScreen onLogout={() => setCurrentScreen('login')} />;
+      return <FacultyScreen 
+        onLogout={() => setCurrentScreen('login')} 
+        userData={userData} // ADD THIS
+      />;
       case 'schedules': // NEW CASE FOR SCHEDULES
         return <ScheduleScreen onBack={() => setCurrentScreen('login')} />;
       case 'login':

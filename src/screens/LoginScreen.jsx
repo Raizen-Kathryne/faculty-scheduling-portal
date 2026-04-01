@@ -21,25 +21,43 @@ export default function LoginScreen({ onLogin, onOpenSchedules }) {
   }, []);
 
   const handleLogin = async (e) => {
-    e.preventDefault();
-    setLoading(true);
-    setError('');
+  e.preventDefault();
+  setLoading(true);
+  setError('');
 
-    try {
-      let response;
-      if (isAdminMode) {
-        response = await loginAdmin(credentials.username, credentials.password);
-      } else {
-        response = await loginFaculty(credentials.username, credentials.password);
-      }
-      setShowModal(false);
-      onLogin(response.user || response.faculty, isAdminMode ? 'admin' : 'faculty'); 
-    } catch (err) {
-      setError(err.message || 'Login failed. Please try again.');
-    } finally {
-      setLoading(false);
+  try {
+    let response;
+    if (isAdminMode) {
+      response = await loginAdmin(credentials.username, credentials.password);
+    } else {
+      response = await loginFaculty(credentials.username, credentials.password);
     }
-  };
+
+    setShowModal(false);
+
+    // ADD THIS: verify token actually saved before switching screens
+    const waitForToken = () => new Promise((resolve) => {
+      const check = () => {
+        const token = localStorage.getItem('token');
+        if (token) {
+          resolve();
+        } else {
+          setTimeout(check, 50); // retry every 50ms
+        }
+      };
+      check();
+    });
+
+    await waitForToken(); // wait until token is confirmed in localStorage
+
+    onLogin(response.user || response.faculty, isAdminMode ? 'admin' : 'faculty');
+
+  } catch (err) {
+    setError(err.message || 'Login failed. Please try again.');
+  } finally {
+    setLoading(false);
+  }
+};
 
   const openLoginModal = (mode) => {
     setIsAdminMode(mode === 'admin');

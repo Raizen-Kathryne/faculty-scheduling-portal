@@ -41,32 +41,26 @@ export const removeToken = () => {
 
 // 1. FACULTY LOGIN
 export const loginFaculty = async (usernameOrEmail, password) => {
-  try {
-    const response = await fetch(`${API_BASE_URL}/auth/login`, {
-      method: 'POST',
-      headers: { 
-        'Content-Type': 'application/json'
-        // No API Key needed for login according to docs
-      },
-      body: JSON.stringify({ 
-        username: usernameOrEmail,  // Backend accepts username field
-        password 
-      }),
-    });
+  const response = await fetch(`${API_BASE_URL}/auth/login`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ username: usernameOrEmail, password }),
+  });
 
-    const data = await response.json();
-    if (!response.ok) throw new Error(data.message || data.error || 'Login failed');
+  const data = await response.json();
+  console.log('LOGIN RESPONSE:', data);        // ? ADD THIS
+  console.log('API_BASE_URL:', API_BASE_URL);  // ? ADD THIS
+  console.log('TOKEN:', data.access_token);    // ? ADD THIS
+  
+  if (!response.ok) throw new Error(data.message || data.error || 'Login failed');
 
-    // Save token and user data from response
-    // Response structure: { access_token, faculty: { faculty_id, username } }
-    const userId = data.faculty?.faculty_id;
-    const token = data.access_token;
-    
-    setToken(token, 'faculty', userId);
-    return data;
-  } catch (error) {
-    throw error;
-  }
+  const userId = data.faculty?.faculty_id;
+  const token = data.access_token;
+  
+  setToken(token, 'faculty', userId);
+
+  console.log('SAVED TOKEN:', localStorage.getItem('token')); // ? ADD THIS
+  return data;
 };
 
 // 2. ADMIN LOGIN (NEW)
