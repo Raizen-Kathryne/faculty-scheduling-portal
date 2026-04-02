@@ -203,23 +203,20 @@ export default function FacultyScreen({ onLogout }) {
     setUploadResult(null);
     
     try {
-      // Sanitize the file client-side before sending to backend.
-      // This fixes AM/PM ambiguity in times like "04:00:00" (should be 16:00:00)
-      // and replaces N/A Subject Codes with the Activity Type value.
       const sanitizedFile = await sanitizeScheduleFile(uploadFile, XLSX);
-      
       const result = await uploadScheduleFile(sanitizedFile, uploadSemesterId);
+      
       setUploadResult(result);
       setUploadStatus('success');
+      
+      // Refresh the local schedule list immediately
       await loadData(); 
     } catch (error) {
-      console.error("Caught upload error:", error);
       setUploadStatus('error');
-      
       setUploadResult({
         error: "Upload Failed",
-        message: error.message || "The file structure is incorrect.",
-        errors: error.validationErrors && error.validationErrors.length > 0 ? error.validationErrors : null
+        message: error.message || "Unread result found or database error.",
+        errors: error.validationErrors 
       });
     }
   };
@@ -230,6 +227,8 @@ export default function FacultyScreen({ onLogout }) {
     setUploadStatus(null);
     setUploadResult(null);
     setIsDragging(false);
+    // Optional: if you still see ghost data, call loadData here
+    loadData();
   };
 
   const openAddModal = () => {

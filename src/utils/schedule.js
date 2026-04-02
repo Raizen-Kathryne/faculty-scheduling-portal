@@ -1,16 +1,14 @@
 // utils/schedule.js
 import { getToken, getFacultyData } from './auth';
-// http://localhost:5000
 const API_BASE_URL = import.meta.env.VITE_API_URL;
-// Use the key from your .env file
 const API_KEY = 'web_ibl9paqzNTF6at_gsIDX0krNbtaTloOTUVQbyuw2aHE'; 
 
 const getHeaders = () => {
   const token = getToken();
   return {
     'Content-Type': 'application/json',
-    'X-API-Key': API_KEY,             // System Auth - ALWAYS include this
-    'Authorization': `Bearer ${token}` // User Auth
+    'X-API-Key': API_KEY,
+    'Authorization': `Bearer ${token}`
   };
 };
 
@@ -74,7 +72,7 @@ export const createDeclaration = async (formData) => {
       room: formData.room,
       semester_id: parseInt(formData.semesterId),
       subject_code: formData.subject,
-      class_section: formData.section, // <--- NEW FIELD
+      class_section: formData.section,
       day: formData.day,
       start_time: formData.startTime,
       end_time: formData.endTime,
@@ -96,7 +94,6 @@ export const createDeclaration = async (formData) => {
         throw new Error('Your session has expired. Please log in again.');
       }
       
-      // Handle Conflict (409) specifically
       if (response.status === 409) {
         throw new Error(data.error || data.message);
       }
@@ -119,13 +116,12 @@ export const createDeclaration = async (formData) => {
   }
 };
 
-// NEW: Update Declaration (Supports editing existing schedules)
 export const updateDeclaration = async (id, formData) => {
   try {
     const payload = {
       room: formData.room,
       subject_code: formData.subject,
-      class_section: formData.section, // <--- NEW FIELD
+      class_section: formData.section,
       day: formData.day,
       start_time: formData.startTime,
       end_time: formData.endTime,
@@ -178,12 +174,10 @@ export const deleteDeclaration = async (id) => {
 
 export const downloadTemplate = async () => {
   try {
-    // --- FIX: Use getHeaders() to send JWT instead of API Key ---
     const response = await fetch(`${API_BASE_URL}/upload/template`, {
       method: 'GET',
       headers: getHeaders(), 
     });
-    // -----------------------------------------------------------
 
     if (response.status === 401) {
        throw new Error('Your session has expired. Please log in again.');
@@ -191,7 +185,6 @@ export const downloadTemplate = async () => {
 
     if (!response.ok) throw new Error('Failed to download template');
 
-    // Handle Blob for file download
     const blob = await response.blob();
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -207,51 +200,129 @@ export const downloadTemplate = async () => {
   }
 };
 
+/**
+ * ✅ FIXED: Proper FormData handling with detailed logging
+ */
 export const uploadScheduleFile = async (file, semesterId) => {
   try {
     const token = getToken();
     
-    // CRITICAL: Check if token exists before making request
+    // ✅ Validate token
     if (!token) {
       throw new Error('You are not logged in. Please log in and try again.');
     }
     
+    // ✅ Validate file
+    if (!file) {
+      throw new Error('No file provided.');
+    }
+
+    // ✅ Ensure file is a File or Blob
+    if (!(file instanceof File || file instanceof Blob)) {
+      throw new Error(`Invalid file type. Expected File or Blob, got ${typeof file}`);
+    }
+    
+    // ✅ Validate semester ID
+    if (!semesterId) {
+      throw new Error('No semester selected.');
+    }
+
+    // ✅ Ensure semester ID is a string for form data
+    const semesterIdStr = String(semesterId).trim();
+    
+    if (!semesterIdStr) {
+      throw new Error('Invalid semester ID.');
+    }
+
+    // ✅ Build FormData
     const formData = new FormData();
     
-    formData.append('file', file);
-    formData.append('semester_id', semesterId);
+    // ✅ Handle Blob without filename
+    if (file instanceof Blob && !(file instanceof File)) {
+      formData.append('file', file, 'schedule.csv');
+      console.log('Appended Blob as file: schedule.csv');
+    } else {
+      formData.append('file', file);
+      console.log('Appended File:', file.name);
+    }
+    
+    formData.append('semester_id', semesterIdStr);
 
+    // ✅ Log request details for debugging
+    console.log('[UPLOAD] Request Details:', {
+      fileName: file.name || 'Blob',
+      fileSize: file.size,
+      fileType: file.type,
+      semesterId: semesterIdStr,
+      apiUrl: API_BASE_URL,
+      timestamp: new Date().toISOString()
+    });
+
+    // ✅ Make request
     const response = await fetch(`${API_BASE_URL}/upload/schedule`, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${token}`,
         'X-API-Key': API_KEY,
-        // CRITICAL: DO NOT SET 'Content-Type' for FormData
+        // ✅ CRITICAL: Do NOT set Content-Type header
+        // Browser will automatically set it to multipart/form-data with boundary
       },
       body: formData
     });
 
-    const data = await response.json();
+    // ✅ Log response status
+    console.log('[UPLOAD] Response Status:', {
+      status: response.status,
+      statusText: response.statusText,
+      contentType: response.headers.get('content-type')
+    });
 
+    // ✅ Check response BEFORE reading body
     if (!response.ok && response.status !== 206) {
-       // Handle 401 Unauthorized specifically
-       if (response.status === 401) {
-         localStorage.removeItem('token');
-         localStorage.removeItem('userRole');
-         localStorage.removeItem('userId');
-         throw new Error('Your session has expired. Please log in again.');
-       }
-       
-       const error = new Error(data.message || data.error || 'Upload failed');
-       if (data.errors && Array.isArray(data.errors)) {
-         error.validationErrors = data.errors;
-       }
-       throw error;
+      let data;
+      try {
+        data = await response.json();
+      } catch (parseError) {
+        console.error('[UPLOAD] Failed to parse error response:', parseError);
+        throw new Error(
+          `Server returned ${response.status}: ${response.statusText}`
+        );
+      }
+
+      console.error('[UPLOAD] Server Error:', data);
+
+      // ✅ Handle 401 specifically
+      if (response.status === 401) {
+        localStorage.removeItem('token');
+        localStorage.removeItem('userRole');
+        localStorage.removeItem('userId');
+        throw new Error('Your session has expired. Please log in again.');
+      }
+      
+      // ✅ Create detailed error
+      const error = new Error(
+        data.message || data.error || `Upload failed with status ${response.status}`
+      );
+      
+      if (data.errors && Array.isArray(data.errors)) {
+        error.validationErrors = data.errors;
+      }
+      
+      throw error;
     }
 
+    // ✅ Only read JSON if response is OK
+    const data = await response.json();
+    console.log('[UPLOAD] Success:', data);
+    
     return data; 
+
   } catch (error) {
-    console.error('Upload error:', error);
+    console.error('[UPLOAD] Error:', {
+      message: error.message,
+      stack: error.stack,
+      validationErrors: error.validationErrors || null
+    });
     throw error;
   }
 };

@@ -48,9 +48,6 @@ export const loginFaculty = async (usernameOrEmail, password) => {
   });
 
   const data = await response.json();
-  console.log('LOGIN RESPONSE:', data);        // ? ADD THIS
-  console.log('API_BASE_URL:', API_BASE_URL);  // ? ADD THIS
-  console.log('TOKEN:', data.access_token);    // ? ADD THIS
   
   if (!response.ok) throw new Error(data.message || data.error || 'Login failed');
 
@@ -58,8 +55,6 @@ export const loginFaculty = async (usernameOrEmail, password) => {
   const token = data.access_token;
   
   setToken(token, 'faculty', userId);
-
-  console.log('SAVED TOKEN:', localStorage.getItem('token')); // ? ADD THIS
   return data;
 };
 
