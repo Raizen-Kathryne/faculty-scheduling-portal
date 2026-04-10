@@ -48,6 +48,9 @@ export const loginFaculty = async (usernameOrEmail, password) => {
   });
 
   const data = await response.json();
+  console.log('LOGIN RESPONSE:', data);        // ? LEAKS USER DATA & TOKEN
+  console.log('API_BASE_URL:', API_BASE_URL);  
+  console.log('TOKEN:', data.access_token);    // ? LEAKS TOKEN
   
   if (!response.ok) throw new Error(data.message || data.error || 'Login failed');
 
@@ -55,6 +58,8 @@ export const loginFaculty = async (usernameOrEmail, password) => {
   const token = data.access_token;
   
   setToken(token, 'faculty', userId);
+
+  console.log('SAVED TOKEN:', localStorage.getItem('token')); // ? LEAKS TOKEN
   return data;
 };
 

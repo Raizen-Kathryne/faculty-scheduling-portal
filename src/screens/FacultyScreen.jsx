@@ -5,14 +5,16 @@ import { sanitizeScheduleFile } from '../utils/sanitizeSchedule';
 import { 
   LogOut, Plus, Trash2, Clock, MapPin, X, Loader2, AlertCircle, 
   RefreshCw, LayoutGrid, Lock, Bell, Upload, FileDown, CheckCircle,
-  FileSpreadsheet, CloudUpload, AlertTriangle
+  FileSpreadsheet, CloudUpload, AlertTriangle, Pencil
 } from 'lucide-react';
 import { 
-  createDeclaration, getMySchedule, formatTimeForDisplay, 
+  createDeclaration, updateDeclaration, getMySchedule, formatTimeForDisplay, 
   deleteDeclaration, getSemesters, downloadTemplate, uploadScheduleFile,
-  getAllRoomsNoFilter // <--- ADD THIS LINE
+  getAllRoomsNoFilter
 } from '../utils/schedule';
 import { getFacultyData, startTokenMonitoring, setTokenExpiryWarningCallback } from '../utils/auth';
+import ScheduleCards from '../components/ScheduleCards';
+import TouchTimePicker from '../components/TouchTimePicker';
 
 export default function FacultyScreen({ onLogout }) {
   const [schedule, setSchedule] = useState([]);
@@ -31,6 +33,17 @@ export default function FacultyScreen({ onLogout }) {
   const [uploadResult, setUploadResult] = useState(null);
   const [isDragging, setIsDragging] = useState(false); // For drag visual feedback
   const fileInputRef = useRef(null);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editItem, setEditItem] = useState(null);
+  const [editForm, setEditForm] = useState({
+    subject: '', section: '', day: 'Monday', startTime: '', endTime: '', room: ''
+  });
+  const [isEditSubmitting, setIsEditSubmitting] = useState(false);
+  const [editError, setEditError] = useState(null);
+  const [editRooms, setEditRooms] = useState([]);
+  const [showEditRoomModal, setShowEditRoomModal] = useState(false);
+  const [editRoomSearch, setEditRoomSearch] = useState('');
+  const [isLoadingEditRooms, setIsLoadingEditRooms] = useState(false);
   // --------------------------------
 
   const [isLoading, setIsLoading] = useState(true);
@@ -169,16 +182,17 @@ export default function FacultyScreen({ onLogout }) {
   };
 
   const handleDrop = (e) => {
-    e.preventDefault();
-    setIsDragging(false);
-    
-    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-      const droppedFile = e.dataTransfer.files[0];
-      if (droppedFile.name.match(/\.(csv|xlsx|xls)$/)) {
-        setUploadFile(droppedFile);
-      } else {
-        alert("Invalid file type. Please upload a CSV or Excel file.");
-      }
+  e.preventDefault();
+  setIsDragging(false);
+  
+  if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+    const droppedFile = e.dataTransfer.files[0];
+    // UPDATED REGEX: Added docx, pdf, and images
+    if (droppedFile.name.match(/\.(csv|xlsx|xls|docx|pdf|jpg|jpeg|png)$/i)) {
+      setUploadFile(droppedFile);
+    } else {
+      alert("Invalid file type. Please upload a CSV, Excel, PDF, Word, or Image file.");
+    }
     }
   };
 
@@ -197,29 +211,37 @@ export default function FacultyScreen({ onLogout }) {
   };
 
   const handleUploadSubmit = async () => {
-    if (!uploadFile || !uploadSemesterId) return;
-    
-    setUploadStatus('uploading');
-    setUploadResult(null);
-    
-    try {
-      const sanitizedFile = await sanitizeScheduleFile(uploadFile, XLSX);
-      const result = await uploadScheduleFile(sanitizedFile, uploadSemesterId);
-      
-      setUploadResult(result);
-      setUploadStatus('success');
-      
-      // Refresh the local schedule list immediately
-      await loadData(); 
-    } catch (error) {
-      setUploadStatus('error');
-      setUploadResult({
-        error: "Upload Failed",
-        message: error.message || "Unread result found or database error.",
-        errors: error.validationErrors 
-      });
+  if (!uploadFile || !uploadSemesterId) return;
+  
+  setUploadStatus('uploading');
+  setUploadResult(null);
+  
+  try {
+    let fileToUpload = uploadFile;
+    const ext = uploadFile.name.split('.').pop().toLowerCase();
+
+    // Only sanitize if it's a spreadsheet format
+    if (['csv', 'xlsx', 'xls'].includes(ext)) {
+      console.log('[UPLOAD] Sanitizing spreadsheet data...');
+      fileToUpload = await sanitizeScheduleFile(uploadFile, XLSX);
+    } else {
+      console.log(`[UPLOAD] Passing ${ext} file directly to backend parser.`);
     }
-  };
+
+    const result = await uploadScheduleFile(fileToUpload, uploadSemesterId);
+    
+    setUploadResult(result);
+    setUploadStatus('success');
+    await loadData(); 
+  } catch (error) {
+    setUploadStatus('error');
+    setUploadResult({
+      error: "Upload Failed",
+      message: error.message || "Unread result found or database error.",
+      errors: error.validationErrors 
+    });
+  }
+};
 
   const closeUploadModal = () => {
     setShowUploadModal(false);
@@ -247,6 +269,12 @@ export default function FacultyScreen({ onLogout }) {
       if (newClass.startTime >= newClass.endTime) {
         throw new Error("Start time must be before End time.");
       }
+      const [sh, sm] = newClass.startTime.split(':').map(Number);
+      const [eh, em] = newClass.endTime.split(':').map(Number);
+      const durationMinutes = (eh * 60 + em) - (sh * 60 + sm);
+      if (durationMinutes > 600) {
+        throw new Error("Schedule duration cannot exceed 10 hours.");
+      }
       const formatTimeForApi = (t) => t.length === 5 ? `${t}:00` : t;
       const submissionData = { ...newClass, startTime: formatTimeForApi(newClass.startTime), endTime: formatTimeForApi(newClass.endTime) };
       await createDeclaration(submissionData);
@@ -268,6 +296,69 @@ export default function FacultyScreen({ onLogout }) {
       alert(err.message); 
     }
   };
+ 
+  const openEditModal = async (item) => {
+    setEditItem(item);
+    setEditForm({
+      subject:   item.subject   === 'N/A' ? '' : item.subject,
+      section:   item.section   === 'N/A' ? '' : item.section,
+      day:       item.day,
+      startTime: item.startTime,
+      endTime:   item.endTime,
+      // room is stored as "Building RoomName" — send only the room name part
+      room: item.room.split(' ').pop(),
+    });
+    setEditError(null);
+    setShowEditModal(true);
+    // Pre-load rooms list in background
+    setIsLoadingEditRooms(true);
+    try {
+      const data = await getAllRoomsNoFilter();
+      setEditRooms(data);
+    } catch (_) {}
+    finally { setIsLoadingEditRooms(false); }
+  };
+ 
+  const handleEditSubmit = async () => {
+    setIsEditSubmitting(true);
+    setEditError(null);
+    try {
+      if (!editForm.subject || !editForm.startTime || !editForm.endTime || !editForm.day) {
+        throw new Error('Please fill in all required fields.');
+      }
+      if (editForm.startTime >= editForm.endTime) {
+        throw new Error('Start time must be before End time.');
+      }
+      const [sh, sm] = editForm.startTime.split(':').map(Number);
+      const [eh, em] = editForm.endTime.split(':').map(Number);
+      const durationMinutes = (eh * 60 + em) - (sh * 60 + sm);
+      if (durationMinutes > 600) {
+        throw new Error('Schedule duration cannot exceed 10 hours.');
+      }
+      const fmt = (t) => t.length === 5 ? `${t}:00` : t;
+      await updateDeclaration(editItem.id, {
+        subject:   editForm.subject   || 'N/A',
+        section:   editForm.section   || 'N/A',
+        day:       editForm.day,
+        startTime: fmt(editForm.startTime),
+        endTime:   fmt(editForm.endTime),
+        room:      editForm.room      || 'N/A',
+      });
+      await loadData();
+      setShowEditModal(false);
+    } catch (err) {
+      setEditError(err.message);
+    } finally {
+      setIsEditSubmitting(false);
+    }
+  };
+ 
+  // Derived: filtered rooms for edit modal search
+  const filteredEditRooms = editRooms.filter(r =>
+    `${r.building_name} ${r.room_name}`.toLowerCase().includes(editRoomSearch.toLowerCase())
+  );
+ 
+  
   
   const getSubjectColor = (subject) => {
     const colors = ['bg-pink-600', 'bg-purple-600', 'bg-indigo-600', 'bg-blue-600', 'bg-teal-600', 'bg-emerald-600', 'bg-orange-600', 'bg-red-600'];
@@ -376,28 +467,12 @@ export default function FacultyScreen({ onLogout }) {
 
         {loadError && (<div className="bg-red-50 text-red-600 p-4 rounded-xl mb-6 flex gap-2 border border-red-100"><AlertCircle /> {loadError}</div>)}
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {!isLoading && visibleSchedule.length === 0 && <div className="col-span-full text-center py-10 text-gray-400 border-2 border-dashed border-gray-200 rounded-xl"><p className="text-lg font-semibold mb-2">No schedules found</p><p className="text-sm">Click "Add Schedule" or "Import" to create your first entry</p></div>}
-          {visibleSchedule.map(item => (
-            <div key={item.id} className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm hover:shadow-md transition-all group relative">
-              <div className="flex justify-between items-start mb-2">
-                <span className="bg-emerald-100 text-emerald-800 text-xs font-bold px-2 py-1 rounded uppercase">{item.day}</span>
-                {item.is_locked ? <div className="text-gray-300"><Lock size={16} /></div> : <button onClick={() => handleDelete(item.id)} className="text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"><Trash2 size={16} /></button>}
-              </div>
-              
-              <div className="flex items-baseline gap-2">
-                <h3 className="font-bold text-lg text-gray-800">{item.subject}</h3>
-                {item.section && <span className="text-sm font-semibold text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded">{item.section}</span>}
-              </div>
-              
-              <p className="text-xs text-gray-500 mb-3">{item.term}</p>
-              <div className="space-y-2 pt-3 border-t border-gray-50">
-                <div className="flex items-center gap-2 text-sm text-gray-600"><Clock size={15} className="text-emerald-500" /><span>{item.startTime} - {item.endTime}</span></div>
-                <div className="flex items-center gap-2 text-sm text-gray-600"><MapPin size={15} className="text-emerald-500" /><span className="truncate">{item.room}</span></div>
-              </div>
-            </div>
-          ))}
-        </div>
+        <ScheduleCards
+          schedule={visibleSchedule}
+          isLoading={isLoading}
+          onEdit={openEditModal}
+          onDelete={handleDelete}
+        />
       </div>
 
       {/* --- UPLOAD MODAL --- */}
@@ -427,8 +502,20 @@ export default function FacultyScreen({ onLogout }) {
                     </select>
                   </div>
                   <div className={`border-2 border-dashed rounded-xl p-8 text-center cursor-pointer transition-all duration-200 flex flex-col items-center justify-center gap-3 ${isDragging ? 'border-emerald-500 bg-emerald-50 scale-[1.02]' : 'border-gray-300 hover:border-emerald-400 hover:bg-gray-50'} ${uploadFile ? 'bg-emerald-50 border-emerald-200' : ''}`} onDragOver={handleDragOver} onDragLeave={handleDragLeave} onDrop={handleDrop} onClick={() => fileInputRef.current?.click()}>
-                    <input type="file" ref={fileInputRef} className="hidden" accept=".csv, .xlsx, .xls" onChange={handleFileSelect}/>
-                    {uploadFile ? (<><div className="w-12 h-12 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center"><FileSpreadsheet size={24} /></div><div><p className="font-bold text-emerald-800 text-sm">{uploadFile.name}</p></div></>) : (<><div className="w-12 h-12 bg-gray-100 text-gray-400 rounded-full flex items-center justify-center group-hover:bg-emerald-100 group-hover:text-emerald-500 transition-colors"><CloudUpload size={24} /></div><div><p className="font-semibold text-gray-600 text-sm">Click to upload or drag and drop</p></div></>)}
+                    <input 
+                      type="file" 
+                      ref={fileInputRef} 
+                      className="hidden" 
+                      // UPDATED: Added new extensions
+                      accept=".csv, .xlsx, .xls, .docx, .pdf, .jpg, .jpeg, .png" 
+                      onChange={handleFileSelect}
+                    />
+                    {uploadFile ? (<><div className="w-12 h-12 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center"><FileSpreadsheet size={24} /></div><div><p className="font-bold text-emerald-800 text-sm">{uploadFile.name}</p></div></>) : (<><div className="w-12 h-12 bg-gray-100 text-gray-400 rounded-full flex items-center justify-center group-hover:bg-emerald-100 group-hover:text-emerald-500 transition-colors"><CloudUpload size={24} /></div><div><p className="font-semibold text-gray-600 text-sm">
+                    Click to upload or drag and drop
+                  </p>
+                  <p className="text-xs text-gray-400 mt-1">
+                    Supports Excel, CSV, PDF, Word, or Scanned Images (JPG/PNG)
+                  </p></div></>)}
                   </div>
                   <button onClick={handleUploadSubmit} disabled={!uploadFile || !uploadSemesterId || uploadStatus === 'uploading'} className="w-full bg-emerald-600 hover:bg-emerald-700 disabled:bg-gray-300 disabled:text-gray-500 disabled:cursor-not-allowed text-white font-bold py-3 rounded-lg shadow-md flex justify-center items-center gap-2 transition-colors mt-2">
                     {uploadStatus === 'uploading' ? <><Loader2 className="animate-spin" size={18} /> Processing...</> : "Upload Schedule"}
@@ -631,7 +718,18 @@ export default function FacultyScreen({ onLogout }) {
               </div>
 
               <div><label className="block text-sm font-bold text-gray-700 mb-1">Day</label><select className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-emerald-500 outline-none bg-white" value={newClass.day} onChange={e => setNewClass({...newClass, day: e.target.value})}>{['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].map(d => (<option key={d} value={d}>{d}</option>))}</select></div>
-              <div className="grid grid-cols-2 gap-4"><div><label className="block text-sm font-bold text-gray-700 mb-1">Start Time</label><input type="time" className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-emerald-500 outline-none" value={newClass.startTime} onChange={e => setNewClass({...newClass, startTime: e.target.value})}/></div><div><label className="block text-sm font-bold text-gray-700 mb-1">End Time</label><input type="time" className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-emerald-500 outline-none" value={newClass.endTime} onChange={e => setNewClass({...newClass, endTime: e.target.value})}/></div></div>
+              <div className="grid grid-cols-2 gap-4">
+              <TouchTimePicker
+                label="Start Time"
+                value={newClass.startTime}
+                onChange={v => setNewClass({ ...newClass, startTime: v })}
+              />
+              <TouchTimePicker
+                label="End Time"
+                value={newClass.endTime}
+                onChange={v => setNewClass({ ...newClass, endTime: v })}
+              />
+            </div>
               <div>
                 <label className="block text-sm font-bold text-gray-700 mb-1">Room Name</label>
                 <div className="flex gap-2">
@@ -653,6 +751,178 @@ export default function FacultyScreen({ onLogout }) {
               </div>
               
               <button onClick={handleAddSubmit} disabled={isSubmitting || !newClass.semesterId} className="w-full bg-emerald-600 hover:bg-emerald-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white font-bold py-3 rounded-lg shadow-md mt-2 flex justify-center items-center gap-2 transition-colors">{isSubmitting ? <Loader2 className="animate-spin" /> : "Save Schedule"}</button>
+            </div>
+          </div>
+        </div>
+      )}
+      {showEditModal && editItem && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col max-h-[90vh]">
+ 
+            <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-gray-50">
+              <div>
+                <h3 className="text-lg font-bold text-gray-800 flex items-center gap-2">
+                  <Pencil size={18} className="text-emerald-600" /> Edit Schedule
+                </h3>
+                <p className="text-xs text-gray-500 mt-0.5">{editItem.day} · {editItem.startTime} – {editItem.endTime}</p>
+              </div>
+              <button onClick={() => setShowEditModal(false)}>
+                <X size={20} className="text-gray-400 hover:text-gray-600" />
+              </button>
+            </div>
+ 
+            <div className="p-6 space-y-4 overflow-y-auto flex-1">
+              {editError && (
+                <div className="bg-red-50 text-red-600 p-3 rounded-lg text-sm flex items-start gap-2 border border-red-200">
+                  <AlertCircle size={16} className="flex-shrink-0 mt-0.5" />
+                  <p>{editError}</p>
+                </div>
+              )}
+
+              {/* N/A warning banner */}
+              {(editItem.subject === 'N/A' || editItem.section === 'N/A') && (
+                <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 flex items-start gap-2">
+                  <AlertTriangle size={15} className="text-amber-500 flex-shrink-0 mt-0.5" />
+                  <p className="text-xs text-amber-800">
+                    This entry has incomplete data from the import. Fill in the correct values below.
+                  </p>
+                </div>
+              )}
+ 
+              {/* Subject + Section */}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-1">
+                    Subject Code
+                    {editItem.subject === 'N/A' && (
+                      <span className="ml-1 text-amber-500 text-xs font-normal">(was N/A)</span>
+                    )}
+                  </label>
+                  <input
+                    className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-emerald-500 outline-none"
+                    placeholder="e.g. CPP106"
+                    value={editForm.subject}
+                    onChange={e => setEditForm({ ...editForm, subject: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-1">
+                    Section
+                    {editItem.section === 'N/A' && (
+                      <span className="ml-1 text-amber-500 text-xs font-normal">(was N/A)</span>
+                    )}
+                  </label>
+                  <input
+                    className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-emerald-500 outline-none"
+                    placeholder="e.g. 2CPEA"
+                    value={editForm.section}
+                    onChange={e => setEditForm({ ...editForm, section: e.target.value })}
+                  />
+                </div>
+              </div>
+ 
+              {/* Day */}
+              <div>
+                <label className="block text-sm font-bold text-gray-700 mb-1">Day</label>
+                <select
+                  className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-emerald-500 outline-none bg-white"
+                  value={editForm.day}
+                  onChange={e => setEditForm({ ...editForm, day: e.target.value })}
+                >
+                  {['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'].map(d => (
+                    <option key={d} value={d}>{d}</option>
+                  ))}
+                </select>
+              </div>
+ 
+              {/* Start / End time */}
+              <div className="grid grid-cols-2 gap-4">
+                <TouchTimePicker
+                  label="Start Time"
+                  value={editForm.startTime}
+                  onChange={v => setEditForm({ ...editForm, startTime: v })}
+                />
+                <TouchTimePicker
+                  label="End Time"
+                  value={editForm.endTime}
+                  onChange={v => setEditForm({ ...editForm, endTime: v })}
+                />
+            </div>
+ 
+              {/* Room with inline picker */}
+              <div>
+                <label className="block text-sm font-bold text-gray-700 mb-1">Room</label>
+                <div className="flex gap-2">
+                  <input
+                    className="flex-1 px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-emerald-500 outline-none"
+                    placeholder="e.g. 319 or BCH101"
+                    value={editForm.room}
+                    onChange={e => setEditForm({ ...editForm, room: e.target.value })}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowEditRoomModal(true)}
+                    className="px-3 py-2 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-lg text-xs font-bold hover:bg-emerald-100 transition-colors flex items-center gap-1"
+                  >
+                    <MapPin size={14} /> Rooms
+                  </button>
+                </div>
+              </div>
+ 
+              {/* Save button */}
+              <button
+                onClick={handleEditSubmit}
+                disabled={isEditSubmitting}
+                className="w-full bg-emerald-600 hover:bg-emerald-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white font-bold py-3 rounded-lg shadow-md flex justify-center items-center gap-2 transition-colors"
+              >
+                {isEditSubmitting ? <><Loader2 className="animate-spin" size={18} /> Saving...</> : 'Save Changes'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+ 
+      {/* --- EDIT ROOM PICKER MODAL --- */}
+      {showEditRoomModal && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden flex flex-col max-h-[80vh]">
+            <div className="px-6 py-4 border-b flex justify-between items-center bg-gray-50">
+              <h3 className="font-bold text-gray-800">Select Room</h3>
+              <button onClick={() => setShowEditRoomModal(false)}><X size={20} /></button>
+            </div>
+            <div className="p-4 border-b">
+              <input
+                className="w-full px-4 py-2 bg-gray-100 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 outline-none"
+                placeholder="Search room or building..."
+                value={editRoomSearch}
+                onChange={e => setEditRoomSearch(e.target.value)}
+              />
+            </div>
+            <div className="flex-1 overflow-y-auto p-2">
+              {isLoadingEditRooms ? (
+                <div className="flex flex-col items-center py-10 text-gray-400">
+                  <Loader2 className="animate-spin mb-2" />
+                  <p className="text-sm">Fetching rooms...</p>
+                </div>
+              ) : filteredEditRooms.length === 0 ? (
+                <p className="text-center py-10 text-gray-500 text-sm">No rooms found.</p>
+              ) : (
+                <div className="grid grid-cols-1 gap-1">
+                  {filteredEditRooms.map(room => (
+                    <button
+                      key={room.room_id}
+                      onClick={() => {
+                        setEditForm(prev => ({ ...prev, room: room.room_name }));
+                        setShowEditRoomModal(false);
+                      }}
+                      className="flex flex-col items-start p-3 hover:bg-emerald-50 rounded-xl transition-colors text-left border border-transparent hover:border-emerald-100 group"
+                    >
+                      <span className="font-bold text-gray-800 group-hover:text-emerald-700">{room.room_name}</span>
+                      <span className="text-xs text-gray-500">{room.building_name}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         </div>

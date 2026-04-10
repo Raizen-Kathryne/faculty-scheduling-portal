@@ -51,7 +51,7 @@ const getDurationSpan = (start, end) => {
 // ---------------------------------------------------------------------------
 // DEPARTMENTS list
 // ---------------------------------------------------------------------------
-const DEPARTMENTS = ['All', 'COE', 'CHAS', 'CCS', 'CBA', 'COED', 'CAS'];
+const DEPARTMENTS = ['All', 'COE', 'CHAS', 'CCS', 'CBAA', 'COED', 'CAS'];
 
 // ---------------------------------------------------------------------------
 // SUB-COMPONENT: Professor Card
