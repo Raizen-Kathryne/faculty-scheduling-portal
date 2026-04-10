@@ -296,6 +296,12 @@ export default function FacultyScreen({ onLogout }) {
       alert(err.message); 
     }
   };
+  const handleDeleteSem = async (semName, ids) => {
+  // Delete each unlocked declaration in the semester one by one
+  await Promise.all(ids.map(id => deleteDeclaration(id)));
+  // Refresh cards after all deletes
+  await loadData();
+  };
  
   const openEditModal = async (item) => {
     setEditItem(item);
@@ -472,6 +478,7 @@ export default function FacultyScreen({ onLogout }) {
           isLoading={isLoading}
           onEdit={openEditModal}
           onDelete={handleDelete}
+          onDeleteSem={handleDeleteSem}
         />
       </div>
 
